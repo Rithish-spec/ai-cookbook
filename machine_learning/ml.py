@@ -7,3 +7,5 @@ filename = os.path.join(os.path.dirname(__file__), "data", "iris.csv")
 
 df = pd.read_csv(filename)
 table = df.to_markdown(index=False)
+print(table)
+
