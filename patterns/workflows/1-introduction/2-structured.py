@@ -27,7 +27,7 @@ completion = client.beta.chat.completions.parse(
         {"role": "system", "content": "Extract the event information."},
         {
             "role": "user",
-            "content": "Alice and Bob are going to a science fair on Friday.",
+            "content": "Alice and Bob are going to a science fair on Friday, the 30th of October.",
         },
     ],
     response_format=CalendarEvent,

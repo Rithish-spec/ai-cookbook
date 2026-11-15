@@ -30,6 +30,17 @@ class EventExtraction(BaseModel):
     )
     confidence_score: float = Field(description="Confidence score between 0 and 1")
 
+    def calculate_confidence_score(self) -> float:
+        confidence_score = 0.0
+        if self.is_calender_event:
+            confidence_score = 1.0
+        else:
+            confidence_score = 0.0
+        return confidence_score
+    
+    confidence_score = calculate_confidence_score()
+
+
 
 class EventDetails(BaseModel):
     """Second LLM call: Parse specific event details"""

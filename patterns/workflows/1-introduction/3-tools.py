@@ -49,6 +49,8 @@ tools = [
     }
 ]
 
+available_tools = [tool["function"]["name"] for tool in tools]
+
 system_prompt = "You are a helpful weather assistant."
 
 messages = [
