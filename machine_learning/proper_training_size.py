@@ -24,7 +24,13 @@ def simulate_train_sizes(
     target=target_column,
     test_fraction=test_size,
     baseline_train_fraction=train_size,
+    model_factory=None,
 ):
+    if model_factory is None:
+        model_factory = lambda: xgb.XGBRegressor(
+            objective="reg:squarederror", random_state=random_state, n_jobs=1
+        )
+
     if target not in df.columns:
         raise ValueError(f"Target column {target!r} is not in the dataset.")
 
@@ -62,11 +68,7 @@ def simulate_train_sizes(
             continue
 
         selected_indices = nested_train_indices[:training_count]
-        model = xgb.XGBRegressor(
-            objective="reg:squarederror",
-            random_state=random_state,
-            n_jobs=1,
-        )
+        model = model_factory()
         model.fit(X.iloc[selected_indices], y.iloc[selected_indices])
         predictions = model.predict(X.iloc[test_indices])
         rmse = float(np.sqrt(mean_squared_error(y.iloc[test_indices], predictions)))

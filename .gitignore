@@ -118,3 +118,5 @@ CLAUDE.md
 # Codex
 .agents/
 AGENTS.md
+mlruns/
+mlflow.db
