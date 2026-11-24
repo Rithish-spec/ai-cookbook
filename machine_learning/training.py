@@ -8,7 +8,7 @@ import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
 
-from anomaly_rules import flag_anomalies
+import anomaly_store
 from proper_training_size import (
     filename,
     random_state,
@@ -32,14 +32,15 @@ def make_model():
 
 
 def prepare(df):
-    flags = flag_anomalies(df)
-    print("Anomalies per rule:\n", flags.sum().to_string(), sep="")
-    for rule, count in flags.sum().items():
-        mlflow.log_metric(f"anomalies_{rule}", int(count))
-    clean = df[~flags["is_anomaly"]].reset_index(drop=True)
-    clean = clean.drop(columns=[c for c in DROP_FEATURES if c in clean.columns])
+    """Drop anomalies using the persistent store. Returns (clean_df, clean_keys, anomaly_keys)."""
+    is_anomaly, keys = anomaly_store.sync(df)
+    mlflow.log_metrics({"rows_anomalous": int(is_anomaly.sum())})
+    mlflow.log_param("anomaly_rules_fingerprint", anomaly_store.rules_fingerprint())
+    mlflow.log_artifacts(anomaly_store.STORE_DIR, artifact_path="anomaly_store")
+    clean = df[~is_anomaly].drop(columns=[c for c in DROP_FEATURES if c in df.columns])
+    clean_keys = keys[~is_anomaly].reset_index(drop=True)
     print(f"Kept {len(clean)} of {len(df)} rows after anomaly filtering.")
-    return clean
+    return clean.reset_index(drop=True), clean_keys, set(keys[is_anomaly])
 
 
 def train(df):
@@ -59,7 +60,7 @@ def _train(df):
             "dropped_features": ",".join(DROP_FEATURES),
         }
     )
-    clean = prepare(df)
+    clean, clean_keys, anomaly_keys = prepare(df)
     mlflow.log_metrics({"rows_total": len(df), "rows_clean": len(clean)})
 
     # 1. Find the smallest sufficient training size (clean data only).
@@ -79,6 +80,10 @@ def _train(df):
     )
     n = min(len(train_idx), max(1, int(len(clean) * fraction)))
     train_idx = np.random.default_rng(random_state).permutation(train_idx)[:n]
+
+    # Hard guarantee: nothing flagged as an anomaly is in the training set.
+    leaked = anomaly_keys & set(clean_keys.iloc[train_idx])
+    assert not leaked, f"{len(leaked)} anomalous rows ended up in training data"
 
     model = make_model().fit(X.iloc[train_idx], y.iloc[train_idx])
     rmse = float(np.sqrt(mean_squared_error(y.iloc[test_idx], model.predict(X.iloc[test_idx]))))
